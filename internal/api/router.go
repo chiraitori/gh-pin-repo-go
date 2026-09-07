@@ -42,8 +42,20 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		v1.GET("/health", handler.HealthCheck)
 	}
 
-	// Redirect root to swagger UI
+	// Redirect root to swagger UI, or handle legacy ?username= query
 	r.GET("/", func(c *gin.Context) {
+		username := c.Query("username")
+		if username != "" {
+			c.Params = append(c.Params, gin.Param{Key: "username", Value: username})
+			// default to raw=true for legacy /?username= compatibility
+			if c.Query("raw") == "" {
+				q := c.Request.URL.Query()
+				q.Set("raw", "true")
+				c.Request.URL.RawQuery = q.Encode()
+			}
+			handler.GetPinnedRepos(c)
+			return
+		}
 		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
 	})
 
