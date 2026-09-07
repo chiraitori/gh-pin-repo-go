@@ -1,0 +1,142 @@
+basePath: /
+definitions:
+  model.ApiResponse:
+    properties:
+      cached:
+        example: false
+        type: boolean
+      data:
+        items:
+          $ref: '#/definitions/model.PinnedRepo'
+        type: array
+      message:
+        example: Successfully fetched pinned repositories
+        type: string
+      success:
+        example: true
+        type: boolean
+      total:
+        example: 6
+        type: integer
+    type: object
+  model.ErrorResponse:
+    properties:
+      error:
+        example: 404 Not Found
+        type: string
+      message:
+        example: User not found or has no pinned repositories
+        type: string
+      success:
+        example: false
+        type: boolean
+    type: object
+  model.PinnedRepo:
+    properties:
+      description:
+        example: Random digital audio effects
+        type: string
+      forks:
+        example: 217
+        type: integer
+      forksDisplay:
+        example: "217"
+        type: string
+      isFork:
+        example: false
+        type: boolean
+      language:
+        example: C
+        type: string
+      languageColor:
+        example: '#555555'
+        type: string
+      link:
+        example: https://github.com/torvalds/AudioNoise
+        type: string
+      owner:
+        example: torvalds
+        type: string
+      repo:
+        example: AudioNoise
+        type: string
+      stars:
+        example: 4500
+        type: integer
+      starsDisplay:
+        example: 4.5k
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: API Support
+    url: https://github.com
+  description: High-performance, production-ready RESTful API in Golang to query GitHub
+    pinned repositories with Swagger UI.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: GitHub Pinned Repositories API
+  version: "1.0"
+paths:
+  /api/v1/pinned/{username}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve pinned repositories for a specific GitHub user or organization
+      parameters:
+      - description: GitHub username or organization name
+        example: torvalds
+        in: path
+        name: username
+        required: true
+        type: string
+      - default: false
+        description: Force scrape and bypass cache
+        in: query
+        name: refresh
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Get GitHub pinned repositories
+      tags:
+      - pinned
+  /health:
+    get:
+      description: Check API service health status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - health
+swagger: "2.0"
