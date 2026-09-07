@@ -42,6 +42,9 @@ definitions:
       forksDisplay:
         example: "217"
         type: string
+      image:
+        example: https://opengraph.githubassets.com/1/torvalds/AudioNoise
+        type: string
       isFork:
         example: false
         type: boolean
@@ -67,7 +70,7 @@ definitions:
         example: 4.5k
         type: string
     type: object
-host: localhost:8080
+host: localhost:8344
 info:
   contact:
     name: API Support
@@ -97,6 +100,11 @@ paths:
         description: Force scrape and bypass cache
         in: query
         name: refresh
+        type: boolean
+      - default: false
+        description: Return raw array directly for 100% gh-pinned-repos compatibility
+        in: query
+        name: raw
         type: boolean
       produces:
       - application/json

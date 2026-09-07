@@ -14,7 +14,7 @@
         },
         "version": "1.0"
     },
-    "host": "localhost:8080",
+    "host": "localhost:8344",
     "basePath": "/",
     "paths": {
         "/api/v1/pinned/{username}": {
@@ -44,6 +44,13 @@
                         "default": false,
                         "description": "Force scrape and bypass cache",
                         "name": "refresh",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Return raw array directly for 100% gh-pinned-repos compatibility",
+                        "name": "raw",
                         "in": "query"
                     }
                 ],
@@ -164,6 +171,10 @@
                 "forksDisplay": {
                     "type": "string",
                     "example": "217"
+                },
+                "image": {
+                    "type": "string",
+                    "example": "https://opengraph.githubassets.com/1/torvalds/AudioNoise"
                 },
                 "isFork": {
                     "type": "boolean",

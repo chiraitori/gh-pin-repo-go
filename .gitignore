@@ -24,6 +24,9 @@ go.work
 __pycache__/
 *.pyc
 .pytest_cache/
+deploy*.py
+deploy_vps.py
+.env
 
 # IDE & Editor files
 .idea/

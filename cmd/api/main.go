@@ -29,7 +29,7 @@ import (
 // @license.name    MIT
 // @license.url     https://opensource.org/licenses/MIT
 
-// @host      localhost:8080
+// @host      localhost:8344
 // @BasePath  /
 func main() {
 	// Maximize CPU utilization for high concurrency
@@ -38,7 +38,7 @@ func main() {
 	// Read environment variables
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8344"
 	}
 
 	mode := os.Getenv("GIN_MODE")

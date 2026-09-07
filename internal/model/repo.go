@@ -12,6 +12,7 @@ type PinnedRepo struct {
 	Forks         int    `json:"forks" example:"217"`
 	ForksDisplay  string `json:"forksDisplay" example:"217"`
 	Link          string `json:"link" example:"https://github.com/torvalds/AudioNoise"`
+	Image         string `json:"image" example:"https://opengraph.githubassets.com/1/torvalds/AudioNoise"`
 	IsFork        bool   `json:"isFork" example:"false"`
 }
 

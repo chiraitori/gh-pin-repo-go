@@ -29,6 +29,7 @@ func NewHandler(pinService service.PinService) *Handler {
 // @Produce      json
 // @Param        username path string true "GitHub username or organization name" example(torvalds)
 // @Param        refresh query boolean false "Force scrape and bypass cache" default(false)
+// @Param        raw query boolean false "Return raw array directly for 100% gh-pinned-repos compatibility" default(false)
 // @Success      200 {object} model.ApiResponse
 // @Failure      400 {object} model.ErrorResponse
 // @Failure      404 {object} model.ErrorResponse
@@ -46,6 +47,7 @@ func (h *Handler) GetPinnedRepos(c *gin.Context) {
 	}
 
 	forceRefresh := c.DefaultQuery("refresh", "false") == "true"
+	rawFormat := c.DefaultQuery("raw", "false") == "true"
 
 	repos, cached, err := h.pinService.GetPinnedRepos(c.Request.Context(), username, forceRefresh)
 	if err != nil {
@@ -71,6 +73,12 @@ func (h *Handler) GetPinnedRepos(c *gin.Context) {
 			Message: "Failed to fetch pinned repositories",
 			Error:   err.Error(),
 		})
+		return
+	}
+
+	// If raw requested, return flat array for 100% gh-pinned-repos compatibility
+	if rawFormat {
+		c.JSON(http.StatusOK, repos)
 		return
 	}
 

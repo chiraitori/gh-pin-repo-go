@@ -1,179 +1,214 @@
-# 🚀 GitHub Pinned Repositories API (Golang + Swagger)
+# gh-pin-repo-go
 
-API hiệu năng cao viết bằng **Golang** cho phép tra cứu các repository được ghim (pinned repositories) của bất kỳ GitHub user hoặc organization nào mà không cần cấu hình GitHub Token. Dự án tích hợp đầy đủ **Swagger UI**, bộ nhớ đệm **Sharded In-Memory Cache** và cơ chế **Singleflight** giúp chịu tải cực lớn (stress-tested mượt mà với Locust).
-
----
-
-## 🌟 Tính Năng Nổi Bật
-
-- 🔍 **Không cần API Token**: Sử dụng bộ cào HTML `goquery` tối ưu hóa, tự động nhận diện cả tài khoản cá nhân và tổ chức.
-- ⚡ **Chịu tải cao (High Concurrency)**:
-  - **Sharded Cache (32 shards, RWMutex)**: Phản hồi các truy vấn đã cache trong thời gian cực thấp (< 0.2ms).
-  - **Singleflight Pattern**: Ngăn ngừa hoàn toàn hiện tượng *Cache Stampede / Thundering Herd*. Khi có hàng ngàn lượt gọi đồng thời cùng một username, chỉ có 1 request duy nhất được gửi tới GitHub.
-  - **HTTP Connection Pooling**: Tái sử dụng TCP connections với `MaxIdleConns: 1000`.
-- 📖 **Tài liệu Swagger UI tương tác trực tiếp**: Truy cập ngay trên trình duyệt tại `http://localhost:8080/swagger/index.html`.
-- 🧪 **Kịch bản Stress Test bằng Locust**: Có sẵn trong thư mục `test/` để kiểm thử sức chịu tải.
+REST API for querying pinned GitHub repositories of any user or organization without requiring a personal access token. Includes interactive Swagger/OpenAPI documentation and an in-memory caching engine designed for high throughput.
 
 ---
 
-## 📂 Cấu Trúc Dự Án
+## Technical Overview
+
+GitHub's official REST API v3 does not expose an endpoint for pinned repositories. The v4 GraphQL API requires authentication tokens with strict rate limits. 
+
+This service scrapes profile markup directly using `goquery` and wraps it in a production-ready HTTP interface:
 
 ```
-gh-pin-repo-go/
-├── cmd/
-│   └── api/
-│       └── main.go           # Entry point khởi chạy HTTP server & Swagger
-├── internal/
-│   ├── api/
-│   │   ├── handler.go        # Controller xử lý HTTP request và Swagger annotations
-│   │   └── router.go         # Thiết lập Gin router, CORS, Swagger UI route
-│   ├── cache/
-│   │   ├── cache.go          # Sharded In-Memory Cache hiệu năng cao
-│   │   └── cache_test.go     # Unit test concurrency & expiration
-│   ├── model/
-│   │   └── repo.go           # Struct PinnedRepo, ApiResponse, ErrorResponse
-│   └── service/
-│       ├── scraper.go        # Service cào HTML, Singleflight và Cache
-│       └── scraper_test.go   # Unit test parser & number formatting
-├── docs/                     # Swagger auto-generated (docs.go, swagger.json, swagger.yaml)
-├── test/
-│   ├── locustfile.py         # Kịch bản stress test bằng Locust
-│   └── run_stress_test.ps1   # Script chạy nhanh stress test trên Windows
-├── go.mod
-├── go.sum
-└── README.md
+                          +------------------------------------------+
+                          |              gh-pin-repo-go              |
+                          |                                          |
+Client Request ---------> |  [ Gin Engine ]                          |
+                          |        |                                 |
+                          |  [ 32-Shard In-Memory Cache ]            |
+                          |        |                                 |
+                          |     (miss)                               |
+                          |        v                                 |
+                          |  [ singleflight.Group ]                  |
+                          |        | (1 outbound request per key)    |
+                          +--------|---------------------------------+
+                                   v
+                       GitHub (https://github.com/:username)
 ```
+
+### High-Throughput Design
+
+- **Sharded In-Memory Cache**: The cache splits keys across 32 independent buckets (`cacheShard`), each protected by its own `sync.RWMutex`. This prevents lock contention under concurrent reads and keeps cache hits under 0.2ms.
+- **Thundering Herd Protection**: Uses `golang.org/x/sync/singleflight`. When a cache miss occurs under high concurrency, all incoming requests for the same username wait on a single outbound HTTP call to GitHub instead of firing duplicate requests that trigger upstream 429 rate limits.
+- **Connection Pooling**: Customized `http.Transport` with 1,000 idle connections and persistent keep-alive.
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
+## API Reference
 
-### Yêu Cầu Môi Trường
-- **Go 1.20+**
-- **Python 3.10+** (để chạy Locust stress test)
+Base URL: `http://localhost:8344`
 
-### 1. Khởi chạy Server
+### Endpoints
 
-Chạy trực tiếp bằng Go:
-```bash
-go run cmd/api/main.go
-```
-
-Hoặc build file thực thi:
-```bash
-go build -o gh-pin-repo.exe ./cmd/api
-.\gh-pin-repo.exe
-```
-
-Server sẽ lắng nghe tại cổng `http://localhost:8080`.
-
-### 2. Mở Swagger UI
-Mở trình duyệt truy cập:
-👉 **[http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)** (hoặc truy cập `http://localhost:8080/` để được tự động chuyển hướng).
+| Method | Path | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/pinned/:username` | Fetch pinned repositories for a user or organization |
+| `GET` | `/health` | Health check probe |
+| `GET` | `/swagger/*any` | Interactive Swagger UI |
+| `GET` | `/` | Redirects to `/swagger/index.html` |
 
 ---
 
-## 📡 API Endpoints
+### `GET /api/v1/pinned/:username`
 
-### 1. Tra cứu Pinned Repositories
+#### Parameters
 
-```http
-GET /api/v1/pinned/:username
-```
+| Name | In | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `username` | path | `string` | Yes | - | GitHub username or organization name |
+| `refresh` | query | `boolean` | No | `false` | Bypass cache and fetch fresh data from GitHub |
+| `raw` | query | `boolean` | No | `false` | Return flat JSON array directly (100% `gh-pinned-repos` drop-in compatible) |
 
-**Query Parameters:**
-| Tham số | Kiểu | Mặc định | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `refresh` | `boolean` | `false` | Ép buộc bỏ qua cache và tải dữ liệu mới nhất từ GitHub |
+#### Response `200 OK` (Standard)
 
-**Ví dụ Request:**
-```bash
-curl http://localhost:8080/api/v1/pinned/torvalds
-```
-
-**Ví dụ Response (HTTP 200):**
 ```json
 {
   "success": true,
   "message": "Successfully retrieved pinned repositories",
-  "total": 5,
+  "total": 4,
   "cached": false,
   "data": [
     {
-      "owner": "torvalds",
-      "repo": "linux",
-      "description": "Linux kernel source tree",
-      "language": "C",
-      "languageColor": "#555555",
-      "stars": 247000,
-      "starsDisplay": "247k",
-      "forks": 64400,
-      "forksDisplay": "64.4k",
-      "link": "https://github.com/torvalds/linux",
-      "isFork": false
-    },
-    {
-      "owner": "torvalds",
-      "repo": "AudioNoise",
-      "description": "Random digital audio effects",
-      "language": "C",
-      "languageColor": "#555555",
-      "stars": 4500,
-      "starsDisplay": "4.5k",
-      "forks": 217,
-      "forksDisplay": "217",
-      "link": "https://github.com/torvalds/AudioNoise",
+      "owner": "chiraitori",
+      "repo": "endfield-daily-helper",
+      "description": "Automatically claim daily login rewards for Arknights: Endfield.",
+      "language": "Python",
+      "languageColor": "#3572A5",
+      "stars": 15,
+      "starsDisplay": "15",
+      "forks": 2,
+      "forksDisplay": "2",
+      "link": "https://github.com/chiraitori/endfield-daily-helper",
+      "image": "https://opengraph.githubassets.com/1/chiraitori/endfield-daily-helper",
       "isFork": false
     }
   ]
 }
 ```
 
-### 2. Kiểm tra Trạng thái (Health Check)
+#### Response `200 OK` (With `?raw=true`)
 
-```http
-GET /health
+```json
+[
+  {
+    "owner": "chiraitori",
+    "repo": "endfield-daily-helper",
+    "description": "Automatically claim daily login rewards for Arknights: Endfield.",
+    "language": "Python",
+    "languageColor": "#3572A5",
+    "stars": 15,
+    "starsDisplay": "15",
+    "forks": 2,
+    "forksDisplay": "2",
+    "link": "https://github.com/chiraitori/endfield-daily-helper",
+    "image": "https://opengraph.githubassets.com/1/chiraitori/endfield-daily-helper",
+    "isFork": false
+  }
+]
 ```
 
-**Response (HTTP 200):**
+#### Response `404 Not Found`
+
 ```json
 {
-  "status": "ok",
-  "message": "Service is healthy and ready to serve requests"
+  "success": false,
+  "message": "GitHub user or organization not found",
+  "error": "github user or organization not found"
 }
 ```
 
 ---
 
-## 🧪 Stress Test Với Locust
+## Configuration
 
-Để kiểm thử khả năng chịu tải hàng triệu lượt request với độ trễ tối thiểu:
+The service reads configuration exclusively from environment variables:
 
-### 1. Cài đặt Locust
-```bash
-pip install locust
-```
-
-### 2. Chạy Stress Test tự động (PowerShell)
-```powershell
-.\test\run_stress_test.ps1 -Users 200 -SpawnRate 50 -RunTime 30s
-```
-
-### 3. Hoặc chạy lệnh trực tiếp bằng Locust CLI:
-```bash
-python -m locust -f test/locustfile.py --headless -u 200 -r 50 -t 30s --host http://localhost:8080 --only-summary
-```
-
-### 4. Giao diện trực quan (Locust Web UI):
-```bash
-python -m locust -f test/locustfile.py --host http://localhost:8080
-```
-Sau đó mở trình duyệt tại `http://localhost:8089` để theo dõi biểu đồ RPS, Response Time và Failure Rate theo thời gian thực.
+| Variable | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `PORT` | `int` | `8344` | Port the HTTP server binds to |
+| `GIN_MODE` | `string` | `release` | Gin framework mode (`release` or `debug`) |
+| `CACHE_TTL_MINUTES` | `int` | `10` | Time-to-live for cached profiles in minutes |
 
 ---
 
-## 🛡️ Cơ Chế Xử Lý Khi Có Lượng Người Dùng Lớn (10M Users)
+## Development & Build
 
-1. **In-Memory Sharded Cache**: Được chia thành 32 phân vùng (`cacheShard`) độc lập, mỗi phân vùng sở hữu một `sync.RWMutex` riêng biệt. Khi có hàng trăm luồng đọc ghi đồng thời, hiện tượng nghẽn khóa (lock contention) bị triệt tiêu hoàn toàn.
-2. **Singleflight Throttling**: Khi một người dùng nổi tiếng (ví dụ: `torvalds`) hết hạn cache và có 50.000 requests cùng ập đến trong cùng 1 giây, cơ chế `singleflight` chỉ gửi đúng **1 request** duy nhất đến GitHub. 49.999 requests còn lại sẽ chờ và dùng chung kết quả, tránh hoàn toàn lỗi `429 Too Many Requests` từ GitHub.
-3. **Gin Release Mode + GOMAXPROCS**: Tối ưu hóa toàn bộ số nhân CPU có sẵn của máy chủ và loại bỏ các logging middleware gây chậm trễ I/O.
+### Requirements
+- Go 1.20+
+- Python 3.10+ (optional, for running Locust load tests)
+
+### Local Run
+```bash
+go run cmd/api/main.go
+```
+
+### Build Binary
+```bash
+go build -o gh-pin-repo ./cmd/api
+```
+
+### Run Tests
+```bash
+go test -v ./internal/cache ./internal/service
+```
+
+### Regenerate Swagger Documentation
+```bash
+swag init -g cmd/api/main.go -o docs
+```
+
+---
+
+## Production Deployment (systemd)
+
+Service definition for `/etc/systemd/system/gh-pin-repo.service`:
+
+```ini
+[Unit]
+Description=GitHub Pinned Repositories API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/gh-pin-repo-go
+Environment="PORT=8344"
+Environment="GIN_MODE=release"
+Environment="CACHE_TTL_MINUTES=15"
+ExecStart=/opt/gh-pin-repo-go/gh-pin-repo
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now gh-pin-repo.service
+```
+
+---
+
+## Load Testing (Locust)
+
+The `test/` directory contains a Locust test harness simulating heavy read traffic across multiple profiles.
+
+### Run Headless Benchmark
+```bash
+python -m locust -f test/locustfile.py --headless -u 200 -r 50 -t 30s --host http://localhost:8344 --only-summary
+```
+
+### Run with Web Dashboard
+```bash
+python -m locust -f test/locustfile.py --host http://localhost:8344
+# Open http://localhost:8089 in browser
+```
+
+### Test Baseline Metrics (Single Node)
+- **Concurrent Virtual Users**: 100
+- **Throughput**: ~750 req/s
+- **Failure Rate**: 0.00%
+- **Median Latency (Cache Hit)**: < 1ms

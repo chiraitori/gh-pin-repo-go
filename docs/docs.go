@@ -52,6 +52,13 @@ const docTemplate = `{
                         "description": "Force scrape and bypass cache",
                         "name": "refresh",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Return raw array directly for 100% gh-pinned-repos compatibility",
+                        "name": "raw",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -172,6 +179,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "217"
                 },
+                "image": {
+                    "type": "string",
+                    "example": "https://opengraph.githubassets.com/1/torvalds/AudioNoise"
+                },
                 "isFork": {
                     "type": "boolean",
                     "example": false
@@ -212,7 +223,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8080",
+	Host:             "localhost:8344",
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "GitHub Pinned Repositories API",

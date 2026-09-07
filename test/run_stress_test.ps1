@@ -2,7 +2,7 @@ param (
     [int]$Users = 200,
     [int]$SpawnRate = 50,
     [string]$RunTime = "30s",
-    [string]$HostUrl = "http://localhost:8080"
+    [string]$HostUrl = "http://localhost:8344"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan

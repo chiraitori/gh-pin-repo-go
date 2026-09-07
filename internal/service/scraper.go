@@ -166,6 +166,9 @@ func (s *pinService) scrapeProfile(ctx context.Context, username string) ([]mode
 				repo.Link = "https://github.com" + href
 			}
 		}
+		if owner != "" && repoName != "" {
+			repo.Image = fmt.Sprintf("https://opengraph.githubassets.com/1/%s/%s", owner, repoName)
+		}
 
 		// Description
 		repo.Description = strings.TrimSpace(s.Find(".pinned-item-desc").First().Text())
